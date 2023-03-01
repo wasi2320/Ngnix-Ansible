@@ -1,0 +1,70 @@
+- hosts: web
+  remote_user: root
+  become: yes
+  vars:
+    NODEJS_VERSION: "16"
+    DESTINATION: "/home/ubuntu/fly-apps"
+    domain: "test.ctalha.com"
+    cors_domain: "ctalha.com"
+    certbot_mail_address: "test@gmail.com"
+  tasks:
+
+# Required Softwares Installation for Backend
+  - name: Install the gpg key for nodejs LTS
+    apt_key:
+      url: "https://deb.nodesource.com/gpgkey/nodesource.gpg.key"
+      state: present 
+  - name: Install the nodejs LTS repos
+    apt_repository:
+      repo: "deb https://deb.nodesource.com/node_{{ NODEJS_VERSION }}.x {{ ansible_distribution_release }} main"
+      state: present
+      update_cache: yes
+  - name: Install the nodejs
+    apt:
+      name: nodejs
+      state: present
+  - name: Install nginx
+    apt:
+      name: nginx
+      state: present
+  - name: Install npm
+    shell: sudo apt install npm -y
+  - name: Install PM2
+    shell: npm install pm2 -g
+  - name: Install Certbot
+    shell: sudo apt install certbot python3-certbot-nginx -y
+
+# CLone the Github Repo
+  - name: Clone Github Repository
+    git:
+      repo: https://github.com/fly-apps/hellonode-builtin
+      dest: "{{ DESTINATION }}"
+      clone: yes
+      update: yes
+  - name: Install packages based on package.json.
+    npm:
+      path: "{{ DESTINATION }}"
+  - name: NODE | Start APP
+    shell: pm2 start server.js
+    args:
+      chdir: "{{ DESTINATION }}"
+
+# Nginx COnfiguration  
+  - name: Nginx default file Remove
+    shell: sudo unlink /etc/nginx/sites-enabled/default
+  - name: copy nginx site.conf
+    template:
+      src:  nginx.conf
+      dest: /etc/nginx/sites-available/{{ domain }}
+  - name: Linking the new file for Nginx
+    shell: sudo ln -s /etc/nginx/sites-available/{{ domain }} /etc/nginx/sites-enabled/
+  - name: Creating the certificate using letsencrypt
+    shell: certbot --nginx  -d {{ domain }} -m {{ certbot_mail_address }} --agree-tos --noninteractive --redirect
+
+
+      
+      
+      
+      
+      
+
